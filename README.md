@@ -1,27 +1,28 @@
 # BLR
 Bayesian Logistic Regressor
 
-# INTRO
+Logistic Regression is a widely used model for binary classification in Machine Learning. It estimates a vector of weights, one per feature, maximizing the likelihood of the weights over the training data. However, it does not provide a measure of uncertainty over its estimation, which can be particulary useful when working with sensible data, as medical data. Probabilistic approaches, as the one presented in this repository, not only provide a measure of uncertainty, but a measure of the quality of training (the ELBO) that allows a proper fine tuning of the parameters of the method.
 
-Weights are assumed to follow a prior Laplacian distribution of zero mean, this way a feature will have to be informative in order to end with an associated weight different from zero:
+Weights are assumed to follow a prior Laplacian distribution of zero mean, this way a feature will have to be informative in order to end with an associated weight different from zero
 
 <img src="https://render.githubusercontent.com/render/math?math=p(\bf{w})=\prod_{d=1}^{D}Laplace(w_d|0,b)= \prod_{d=1}^{D}\frac{1}{2b}exp\left(\frac{-|w_d|}{b}\right)">
 
-Following the Logistic Regression model, likelihood is given by:
+Following the Logistic Regression model, likelihood is given by
 
 <img src="https://render.githubusercontent.com/render/math?math=p(\bf{Y}|\bf{X},\bf{w})=\prod_{n=1}^{N}p(Y_n|\bf{x}_n,\bf{w})=\prod_{n=1}^{N}\sigma(\bf{x}_n^T\bf{w})^{Y_n}(1-\sigma(\bf{x}_n^T\bf{w}))^{(1-Y_n)}">
 
 where <img src="https://render.githubusercontent.com/render/math?math=\sigma"> refers to the Sigmod function.
 
-This way, predictive distribution is given by:
+This way, the predictive distribution is given by
+
 <img src="https://render.githubusercontent.com/render/math?math=p(Y^*|\bf{x}^*)=\int p(Y^*|\bf{x}^*,\bf{w})p(\bf{w}|\bf{X},\bf{Y})d\bf{w}">
 
 where the posterior distribution <img src="https://render.githubusercontent.com/render/math?math=p(\bf{w}|\bf{X},\bf{Y})"> , following Bayes' Theorem, can be expressed as
-<img src="https://render.githubusercontent.com/render/math?math=p(\bf{w}|\bf{X},\bf{Y})=\frac{p(\bf{Y}|\bf{X},\bf{w})p(\bf{w})}{p(\bf{Y}|\bf{X})}">
+<img src="https://render.githubusercontent.com/render/math?math=p(\bf{w}|\bf{X},\bf{Y})=\frac{p(\bf{Y}|\bf{X},\bf{w})p(\bf{w})}{p(\bf{Y}|\bf{X})}">.
 
 However, this expression can't be used since the integral <img src="https://render.githubusercontent.com/render/math?math=p(\bf{Y}|\bf{X})=\int p(\bf{Y}|\bf{X},\bf{w})p(\bf{w})d\bf{w}"> is intractable. Thus, the posterior distribution is approximated by means of Variational Inference. 
 
-This model assumes a Gaussian Variational Family, where mean vector and covariance matrix are learnt from data by means of Neural Networks. The usual approach is to use one Neural Network to learn the mean vector and another one to learn the diagonal of the covariance matrix, but in this case, in order to have a greater influence of the label, there are two Neural Networks to learn the mean vector and two to learn the covariance matrix, one for data with label 1 and another one for data with label 0. 
+This model assumes a Gaussian Variational Family, where mean vector and covariance matrix are learnt from data by means of Neural Networks. The usual approach is to use one Neural Network to learn the mean vector and another one to learn the diagonal of the covariance matrix, but in this case, in order to have a greater influence of the label, this method defines two Neural Networks to learn the mean vector and two to learn the covariance matrix, one for data with label 1 and another one for data with label 0 in both cases. 
 
 The posterior distribution is then approximated as a product of N Gaussians, i.e., it is computed as a contribution of every training sample, taking into account the value of the label. For each sample, a mean vector and a covariance matrix are computed by means of the corresponding Neural Networks. Then, the final expresion is given by  
 
