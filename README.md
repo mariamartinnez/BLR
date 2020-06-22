@@ -39,3 +39,5 @@ In order to find the weights that better explain training data, the Evidence Low
  *  <img src="https://render.githubusercontent.com/render/math?math=\mathbb{E}_{q}\bigg[\log p(\bf{w})\bigg] = \mathbb{E}_{q}\bigg[-\sum_{d=1}^{D}\big[\log(2b)%2B\frac{|w_d|}{b}\big]\bigg]">
  
  * <img src="https://render.githubusercontent.com/render/math?math=\mathbb{E}_{q}\bigg[\log q(\bf{w}|\bf{X},\bf{Y})\bigg] = \mathbb{E}_{q}\bigg[\log(N(\bf{\mu}_{\eta_1}(\bf{X},\bf{Y}), \Sigma_{\eta_2}(\bf{X},\bf{Y})))] = \mathbb{E}_{q}\bigg[-\frac{1}{2}\log(det(2\pi\Sigma_{\eta_2}(\bf{X},\bf{Y})))-\frac{1}{2}(\bf{w}-\bf{\mu}_{\eta_1}(\bf{X},\bf{Y}))^T\Sigma_{\eta_2}^{-1}(\bf{X},\bf{Y})(\bf{w}-\bf{\mu}_{\eta_1}(\bf{X},\bf{Y}))\bigg]">
+
+ In practice it is better to use the -ELBO in order to apply gradient descent methods.
