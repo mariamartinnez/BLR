@@ -3,7 +3,7 @@ Bayesian Logistic Regressor
 
 Logistic Regression is a widely used model for binary classification in Machine Learning. It estimates a vector of weights, one per feature, maximizing the likelihood of the weights over the training data. However, it does not provide a measure of uncertainty over its estimation, which can be particulary useful when working with sensible data, as medical data. Probabilistic approaches, as the one presented in this repository, not only provide a measure of uncertainty, but a measure of the quality of training (the ELBO) that allows a proper fine tuning of the parameters of the method.
 
-Weights are assumed to follow a prior Laplacian distribution of zero mean, this way a feature will have to be informative in order to end with an associated weight different from zero
+Bayesian Logistic Regression model assumes that the weights follow a prior Laplacian distribution of zero mean, this way a feature will have to be informative in order to end with an associated weight different from zero
 
 <img src="https://render.githubusercontent.com/render/math?math=p(\bf{w})=\prod_{d=1}^{D}Laplace(w_d|0,b)= \prod_{d=1}^{D}\frac{1}{2b}exp\left(\frac{-|w_d|}{b}\right)">
 
