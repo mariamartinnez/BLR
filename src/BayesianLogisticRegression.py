@@ -78,48 +78,36 @@ class BayesianLogisticRegression(VariationalLoss):
                 of the iteration should be printed (True) or not (False).
         """
         
-        aux_mean = torch.zeros(x.shape[1])
-        aux_cov = torch.zeros(x.shape[1],x.shape[1])
-
-
         self.optimizer.zero_grad()
         
-        # Compute mean and cov in q(w|x,y) as a contribution of all training samples.
-
-        for i in range(x.shape[0]):
-    
-            if y[i] == 0:
-                
-                self.forward0(x[i,:])
-                
-                # Actualize mean and cov in q(w|x,y)
-                if i==0:
-                    aux_mean = self.mean_0
-                    aux_cov = torch.diag(torch.exp(self.log_var_0))
-                else:
-                    inv_cov = torch.inverse(aux_cov)
-                    inv_var = torch.inverse(torch.diag(torch.exp(self.log_var_0)))                   
-                    aux_mean = torch.inverse(inv_cov + inv_var)@(inv_cov@aux_mean + inv_var@self.mean_0)
-                    aux_cov = torch.inverse(inv_cov + inv_var)
-   
-            if y[i] == 1:
-                
-                self.forward1(x[i,:])
-                
-                # Actualize mean and cov in q(w|x,y)
-                if i==0:
-                    aux_mean = self.mean_1
-                    aux_cov = torch.diag(torch.exp(self.log_var_1))
-                else:
-                    inv_cov = torch.inverse(aux_cov)
-                    inv_var = torch.inverse(torch.diag(torch.exp(self.log_var_1)))
-                    aux_mean = torch.inverse(inv_cov + inv_var)@(inv_cov@aux_mean + inv_var@self.mean_1)
-                    aux_cov = torch.inverse(inv_cov + inv_var)
-                
-  
-        self.mean = aux_mean.unsqueeze(1)
-        self.cov = aux_cov
+        # First, separate data according to the label 
+        x0 = x[torch.where(y==0)[0],:]
+        x1 = x[torch.where(y==1)[0],:]
         
+        # Compute parameters for y = 0 
+        self.forward0(x0)
+        
+        var0_batch = torch.exp(self.log_var_0)
+        inv_var0 = 1/var0_batch
+        
+        var0 =(1/torch.sum(inv_var0, axis=0))
+        mean0 = var0*torch.sum(inv_var0*self.mean_0, axis=0)        
+        
+        # Compute parameters for y = 1
+        self.forward1(x1)
+        
+        var1_batch = torch.exp(self.log_var_1)
+        inv_var1 = 1/var1_batch
+        
+        var1 =(1/torch.sum(inv_var1, axis=0))
+        mean1 = var1*torch.sum(inv_var1*self.mean_1, axis=0)
+        
+        # Compute final parameters 
+        self.var = 1/(1/var0+1/var1)
+        self.cov = torch.diag(self.var)
+        self.mean = self.var*((1/var0)*mean0+(1/var1)*mean1)
+        self.mean = self.mean.unsqueeze(1)
+            
         a = []
         bc = []
         

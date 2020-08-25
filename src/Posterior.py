@@ -62,7 +62,7 @@ class Posterior(nn.Module):
         
         # Mean
         out_mean = self.hidden_mean_0(x)
-        out_mean = self.activation(out_mean)
+        out_mean = self.activation_mean(out_mean)
         self.mean_0 = self.output_mean_0(out_mean) 
         
         # Diagonal variance
@@ -75,7 +75,7 @@ class Posterior(nn.Module):
         
         # Mean
         out_mean = self.hidden_mean_1(x)
-        out_mean = self.activation(out_mean)
+        out_mean = self.activation_mean(out_mean)
         self.mean_1 = self.output_mean_1(out_mean) 
         
         # Diagonal variance

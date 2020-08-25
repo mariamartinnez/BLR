@@ -84,6 +84,6 @@ class VariationalLoss(Posterior):
         the ELBO.
         """
  
-        logprior = -torch.sum(torch.log(2*self.b)+torch.abs(self.sample)/self.b, axis=0)
+        logprior = torch.sum(-torch.log(2*self.b)-torch.abs(self.sample)/self.b, axis=0)
                
         return logprior
