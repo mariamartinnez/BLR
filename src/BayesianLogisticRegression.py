@@ -1,34 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jun  3 10:05:32 2020
+Created on Wed Oct 28 15:47:03 2020
 
 @author: root
 """
-
-from .VariationalLoss import VariationalLoss
 import torch
+from .Variational_Loss import Variational_Loss
 from torch import optim
-from torch import nn
 
 # ----------------------------------------------------------------------- #
 #                  Minimization of the -ELBO for inference                #
 # ----------------------------------------------------------------------- #
 
-class BayesianLogisticRegression(VariationalLoss):
+class BayesianLogisticRegression(Variational_Loss):
     
     """
     Bayesian Logistic Regressor.
     
     Parameters:
-        input_dim (int) - input dimension for the Neural Networks, 
-            which should be equal to the number of features. 
+        D (int) - number of features (dimension of the input data), which 
+            corresponds to the input and output dimension of the Neural Networks. 
         hdim_mean (int) - dimension of the hidden layer for the Neural 
-            Networks that compute the mean vector.
+            Networks that compute the mean vector (weights).
         hdim_var (int) - dimension of the hidden layer for the Neural
             Networks that compute de diagonal of the covariance matrices.
-        output_dim (int) - output dimension for the Neural Networks, 
-            which should be equal to the number of features.
         b (float) - diversity parameter of the prior Laplace ditribution.
         
     Attributes:
@@ -38,31 +34,30 @@ class BayesianLogisticRegression(VariationalLoss):
         cov (tensor) - tensor of shape (D,D), being D the number of features,
             containing the estimated diagonal covariance matrix.     
     """
-
-    def __init__(self, input_dim, hdim_mean, hdim_var, output_dim, b):
+    
+    def __init__(self, D, hdim_mean, hdim_var, b):
         
         """
         Class initializer.
         
         Args:
-            input_dim (int) - input dimension for the Neural Networks, 
-                which should be equal to the number of features. 
+            D (int) - number of features (dimension of the input data), which 
+                corresponds to the input and output dimension of the Neural Networks.
             hdim_mean (int) - dimension of the hidden layer for the Neural 
                 Networks that compute the mean vector.
             hdim_var (int) - dimension of the hidden layer for the Neural
                 Networks that compute de diagonal of the covariance matrices.
-            output_dim (int) - output dimension for the Neural Networks, 
-                which should be equal to the number of features.
             b (float) - diversity parameter of the prior Laplace ditribution.       
         """
+        
+        super().__init__(D, hdim_mean, hdim_var, b)
 
-        super().__init__(input_dim, hdim_mean, hdim_var, output_dim, b)
+        self.optimizer_mean_0 = optim.Adam(self.nn_mean_0.parameters(),lr=1e-2)
+        self.optimizer_mean_1 = optim.Adam(self.nn_mean_1.parameters(),lr=1e-2)
+        self.optimizer_cov_0 = optim.Adam(self.nn_cov_0.parameters(),lr=1e-2)
+        self.optimizer_cov_1 = optim.Adam(self.nn_cov_1.parameters(),lr=1e-2)
 
-        self.optimizer = optim.Adam(self.parameters(), lr=1e-2)
-        self.bce = nn.BCELoss(reduction='none')
-        self.sigmoid = nn.Sigmoid()
-
-    def SGD_step(self, x, y, mc=1, verbose=True):
+    def SGD_step(self, x, y, mc=1, verbose=True, train_mean=True, train_cov=True):
         
         """
         Computes a SGD step over the ELBO loss.
@@ -76,73 +71,42 @@ class BayesianLogisticRegression(VariationalLoss):
                 approximation.
             verbose (boolean, optional) - flag to indicate wether the results
                 of the iteration should be printed (True) or not (False).
+            train_mean (boolean, optional) - flag to indicate wether the mean 
+                Neural Networks should be trained (True) or not (False). 
+            train_cov (boolean, optional) - flag to indicate wether the covariance 
+                Neural Network should be trained (True) or not (False).    
         """
         
-        self.optimizer.zero_grad()
+        self.optimizer_mean_0.zero_grad()
+        self.optimizer_mean_1.zero_grad()
+        self.optimizer_cov_0.zero_grad()
+        self.optimizer_cov_1.zero_grad()
         
-        # First, separate data according to the label 
-        x0 = x[torch.where(y==0)[0],:]
-        x1 = x[torch.where(y==1)[0],:]
+        # Compute the mean vector and the covariance matrix of the posterior
+        # (Forward)
+        self.compute_mean_cov(x, y)
         
-        # Compute parameters for y = 0 
-        self.forward0(x0)
-        
-        var0_batch = torch.exp(self.log_var_0)
-        inv_var0 = 1/var0_batch
-        
-        var0 =(1/torch.sum(inv_var0, axis=0))
-        mean0 = var0*torch.sum(inv_var0*self.mean_0, axis=0)        
-        
-        # Compute parameters for y = 1
-        self.forward1(x1)
-        
-        var1_batch = torch.exp(self.log_var_1)
-        inv_var1 = 1/var1_batch
-        
-        var1 =(1/torch.sum(inv_var1, axis=0))
-        mean1 = var1*torch.sum(inv_var1*self.mean_1, axis=0)
-        
-        # Compute final parameters 
-        self.var = 1/(1/var0+1/var1)
-        self.cov = torch.diag(self.var)
-        self.mean = self.var*((1/var0)*mean0+(1/var1)*mean1)
-        self.mean = self.mean.unsqueeze(1)
-            
-        a = []
-        bc = []
-        
+        # Sample from the posterior
         self.sample_from_q(x.shape[1], mc)
         
-        # Compute the ELBO
+        # Evaluate the ELBO
+        self.ELBO(x, y, mc)
         
-        #1st term
-        entropy = -self.bce(self.sigmoid(x@self.sample), y.repeat(1,mc))
-        entropy = torch.sum(entropy, axis=0)
+        # Compute gradients
+        self.ELBO_loss.backward()    
         
-        #2nd term
-        logprior = self.logprior_term()
+        if train_mean:
+            self.optimizer_mean_0.step()
+            self.optimizer_mean_1.step()
         
-        #3d term
-        logpost = self.logpost_term(mc)
-        
-        # Maximize the ELBO -> Minimize the -ELBO by means of gradient descent
-        self.ELBO_loss = -torch.mean(entropy+logprior-logpost)
-        
-        a.append(torch.mean(entropy))
-        bc.append(torch.mean(logprior-logpost))
-        
-        self.a = torch.mean(torch.tensor(a)) 
-        self.bc = torch.mean(torch.tensor(bc))
+        if train_cov:
+            self.optimizer_cov_0.step()
+            self.optimizer_cov_1.step()
         
         if verbose:
-            print('ELBO_loss: ', self.ELBO_loss)
-            print('a: ', self.a)
-            print('b-c: ', self.bc)
-            
-        self.ELBO_loss.backward()
+            print('\nELBO loss: ', self.ELBO_loss)
 
-        self.optimizer.step()
-
+    
     def predict(self, x_star, mc=200):
         
         """
@@ -163,4 +127,3 @@ class BayesianLogisticRegression(VariationalLoss):
         prob = torch.mean(torch.sigmoid(x_star@self.sample), dim=1)
         
         return prob
-        
